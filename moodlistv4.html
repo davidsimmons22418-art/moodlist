@@ -1,0 +1,1294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<!-- v2.1 PKCE -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Moodlist</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0f;
+  --ink: #e8e4dc;
+  --muted: #6b6870;
+  --accent: #c9a96e;
+  --surface: rgba(255,255,255,0.03);
+  --border: rgba(255,255,255,0.07);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Cormorant Garamond', serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+
+
+/* Ambient background */
+.ambient {
+  position: fixed; inset: 0; z-index: 0;
+  background:
+    radial-gradient(ellipse 60% 40% at 20% 30%, rgba(201,169,110,0.04) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 60% at 80% 70%, rgba(120,100,180,0.04) 0%, transparent 70%);
+  transition: all 2s ease;
+}
+
+/* Grain overlay */
+.grain {
+  position: fixed; inset: -50%;
+  width: 200%; height: 200%;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  opacity: 0.5; pointer-events: none; z-index: 1;
+  animation: grain 0.8s steps(2) infinite;
+}
+@keyframes grain {
+  0%, 100% { transform: translate(0,0); }
+  25% { transform: translate(-2%,-1%); }
+  50% { transform: translate(1%,2%); }
+  75% { transform: translate(2%,-2%); }
+}
+
+/* Layout */
+.app {
+  position: relative; z-index: 2;
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 40px 24px;
+}
+
+/* Screens */
+.screen { display: none; width: 100%; max-width: 640px; }
+.screen.active { display: flex; flex-direction: column; align-items: center; }
+
+/* Intro */
+.logo {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(3rem, 8vw, 5.5rem);
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  margin-bottom: 16px;
+  animation: fadeUp 1s ease both;
+}
+.logo em { font-style: italic; color: var(--accent); }
+
+.tagline {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 300;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 64px;
+  animation: fadeUp 1s 0.2s ease both;
+}
+
+.begin-btn {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.1rem;
+  font-weight: 400;
+  color: var(--ink);
+  background: none;
+  border: 1px solid var(--border);
+  padding: 16px 48px;
+  cursor: pointer;
+  letter-spacing: 0.08em;
+  transition: all 0.4s ease;
+  animation: fadeUp 1s 0.4s ease both;
+  position: relative;
+  overflow: hidden;
+}
+.begin-btn::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: var(--accent);
+  transform: translateX(-100%);
+  transition: transform 0.4s ease;
+  z-index: -1;
+}
+.begin-btn:hover { color: var(--bg); border-color: var(--accent); }
+.begin-btn:hover::before { transform: translateX(0); }
+
+/* Questions */
+.q-meta {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 48px;
+  text-align: center;
+}
+
+.progress-line {
+  width: 100%; height: 1px;
+  background: var(--border);
+  margin-bottom: 60px;
+  position: relative;
+  overflow: hidden;
+}
+.progress-fill {
+  position: absolute; top: 0; left: 0; height: 100%;
+  background: linear-gradient(90deg, var(--accent), rgba(201,169,110,0.3));
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.question-text {
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  font-weight: 300;
+  line-height: 1.3;
+  text-align: center;
+  margin-bottom: 52px;
+  letter-spacing: -0.01em;
+  min-height: 100px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.options-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+}
+
+.option-btn {
+  padding: 20px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--ink);
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.05rem;
+  font-weight: 300;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.3s ease;
+  letter-spacing: 0.02em;
+  position: relative;
+  overflow: hidden;
+}
+.option-btn::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.option-btn:hover { border-color: rgba(201,169,110,0.5); transform: translateY(-2px); }
+.option-btn:hover::after { opacity: 0.06; }
+.option-btn.selected {
+  border-color: var(--accent);
+  background: rgba(201,169,110,0.08);
+}
+.option-letter {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.15em;
+  color: var(--accent);
+  display: block;
+  margin-bottom: 8px;
+}
+
+/* Loading */
+.loading-screen {
+  text-align: center;
+}
+.pulse-ring {
+  width: 80px; height: 80px;
+  border: 1px solid var(--accent);
+  border-radius: 50%;
+  margin: 0 auto 40px;
+  animation: pulseRing 2s ease-in-out infinite;
+  position: relative;
+}
+.pulse-ring::before {
+  content: '';
+  position: absolute; inset: 8px;
+  border: 1px solid rgba(201,169,110,0.3);
+  border-radius: 50%;
+  animation: pulseRing 2s 0.5s ease-in-out infinite;
+}
+@keyframes pulseRing {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.1); opacity: 0.5; }
+}
+.loading-text {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--muted);
+  animation: blink 1.5s ease-in-out infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* Playlist */
+.mood-reveal {
+  text-align: center;
+  margin-bottom: 48px;
+}
+.mood-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+.mood-name {
+  font-size: clamp(2.5rem, 6vw, 4rem);
+  font-weight: 300;
+  font-style: italic;
+  color: var(--accent);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  margin-bottom: 16px;
+}
+.mood-desc {
+  font-size: 1.05rem;
+  font-weight: 300;
+  color: var(--muted);
+  line-height: 1.6;
+  max-width: 480px;
+  margin: 0 auto 8px;
+}
+
+.playlist-header {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 20px;
+  text-align: left;
+  width: 100%;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+}
+
+.track-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.track {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+  transition: all 0.2s ease;
+  opacity: 0;
+  transform: translateY(10px);
+  animation: trackIn 0.5s ease forwards;
+}
+.track:hover { padding-left: 8px; }
+
+@keyframes trackIn {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.track-num {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--muted);
+  min-width: 24px;
+  text-align: right;
+}
+.track-info { flex: 1; min-width: 0; }
+.track-title {
+  font-size: 1rem;
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 3px;
+}
+.track-artist {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+}
+.track-why {
+  font-size: 0.78rem;
+  font-style: italic;
+  color: var(--muted);
+  text-align: right;
+  max-width: 160px;
+  line-height: 1.4;
+}
+
+.search-links {
+  display: flex; gap: 10px;
+  margin-top: 32px;
+  width: 100%;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.search-link {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-decoration: none;
+  padding: 10px 20px;
+  border: 1px solid var(--border);
+  transition: all 0.3s;
+}
+.search-link:hover { color: var(--accent); border-color: var(--accent); }
+
+.restart-btn {
+  margin-top: 48px;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  transition: color 0.3s;
+}
+.restart-btn:hover { color: var(--ink); }
+
+/* API key */
+.api-screen {
+  text-align: center;
+}
+.api-title {
+  font-size: 2rem; font-weight: 300;
+  margin-bottom: 12px;
+}
+.api-sub {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.68rem;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  margin-bottom: 40px;
+  line-height: 1.8;
+}
+.api-input-wrap {
+  width: 100%;
+  display: flex; gap: 0;
+  margin-bottom: 16px;
+}
+.api-input {
+  flex: 1;
+  padding: 16px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-right: none;
+  color: var(--ink);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.78rem;
+  outline: none;
+  transition: border-color 0.3s;
+  letter-spacing: 0.05em;
+}
+.api-input:focus { border-color: rgba(201,169,110,0.4); }
+.api-input::placeholder { color: var(--muted); }
+.api-save {
+  padding: 16px 24px;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: var(--bg);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.3s;
+  white-space: nowrap;
+}
+.api-save:hover { background: transparent; color: var(--accent); }
+.api-status {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  height: 20px;
+  color: var(--accent);
+}
+.api-skip {
+  margin-top: 24px;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.62rem;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  background: none; border: none;
+  cursor: none; text-decoration: underline;
+  text-underline-offset: 4px;
+  transition: color 0.3s;
+}
+.api-skip:hover { color: var(--ink); }
+
+/* Animations */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in { animation: fadeUp 0.6s ease both; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* SPOTIFY */
+.spotify-add-btn {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 28px;
+  background: #1DB954;
+  border: none;
+  color: #000;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.spotify-add-btn:hover { background: #1ed760; transform: translateY(-2px); }
+.spotify-add-btn:active { transform: translateY(0); }
+
+.spotify-modal {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(0,0,0,0.85);
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(8px);
+  animation: fadeUp 0.3s ease;
+}
+.spotify-modal-inner {
+  background: #111118;
+  border: 1px solid var(--border);
+  padding: 48px;
+  max-width: 440px; width: 90%;
+  text-align: center;
+}
+.spotify-modal-title {
+  font-size: 1.8rem; font-weight: 300;
+  margin-bottom: 12px;
+}
+.spotify-modal-sub {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.68rem;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  line-height: 1.8;
+  margin-bottom: 32px;
+}
+.spotify-modal-btn {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 14px 32px;
+  background: #1DB954; border: none; color: #000;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem; letter-spacing: 0.12em;
+  text-transform: uppercase; cursor: none;
+  transition: all 0.3s; margin-bottom: 16px; width: 100%;
+  justify-content: center;
+}
+.spotify-modal-btn:hover { background: #1ed760; }
+.spotify-modal-close {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.62rem; color: var(--muted);
+  letter-spacing: 0.1em; background: none; border: none;
+  cursor: none; text-decoration: underline;
+  text-underline-offset: 4px; transition: color 0.3s;
+}
+.spotify-modal-close:hover { color: var(--ink); }
+.spotify-progress {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem; color: var(--muted);
+  letter-spacing: 0.1em; line-height: 2;
+  text-align: left;
+}
+.spotify-progress span { color: #1DB954; }
+.spotify-done-title {
+  font-size: 1.6rem; font-weight: 300; margin-bottom: 12px;
+}
+.spotify-open-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 12px 28px; background: #1DB954;
+  border: none; color: #000; text-decoration: none;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.68rem; letter-spacing: 0.12em;
+  text-transform: uppercase; transition: all 0.3s;
+  margin-bottom: 16px;
+}
+.spotify-open-btn:hover { background: #1ed760; }
+</style>
+</head>
+<body>
+
+<div class="ambient" id="ambient"></div>
+<div class="grain"></div>
+
+<div class="app">
+
+  <!-- INTRO -->
+  <div class="screen active" id="screen-intro">
+    <div class="logo">mood<em>list</em></div>
+    <div class="tagline">A playlist that sounds like you, right now</div>
+    <button class="begin-btn" onclick="checkAPIKey()">Begin</button>
+  </div>
+
+  <!-- API KEY -->
+  <div class="screen" id="screen-api">
+    <div class="api-screen fade-in">
+      <div class="api-title">One thing first</div>
+      <div class="api-sub">
+        Moodlist uses Claude AI to read between the lines<br>
+        and build your playlist. Paste your Anthropic API key<br>
+        to get started — it's saved only in your browser.
+      </div>
+      <div class="api-input-wrap">
+        <input type="password" class="api-input" id="api-input" placeholder="sk-ant-••••••••••••••••" autocomplete="off">
+        <button class="api-save" onclick="saveKey()">Save</button>
+      </div>
+      <div class="api-status" id="api-status"></div>
+      <a href="https://console.anthropic.com" target="_blank" style="font-family:'DM Mono',monospace;font-size:.62rem;color:var(--muted);display:block;margin-top:12px;letter-spacing:.08em;">→ Get a key at console.anthropic.com</a>
+    </div>
+  </div>
+
+  <!-- QUESTIONS -->
+  <div class="screen" id="screen-questions">
+    <div class="q-meta" id="q-meta">Question 1 of 8</div>
+    <div class="progress-line">
+      <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+    </div>
+    <div class="question-text" id="question-text"></div>
+    <div class="options-grid" id="options-grid"></div>
+  </div>
+
+  <!-- LOADING -->
+  <div class="screen" id="screen-loading">
+    <div class="loading-screen">
+      <div class="pulse-ring"></div>
+      <div class="loading-text" id="loading-text">Reading between the lines</div>
+    </div>
+  </div>
+
+  <!-- PLAYLIST -->
+  <div class="screen" id="screen-playlist">
+    <div class="mood-reveal">
+      <div class="mood-label">Your mood</div>
+      <div class="mood-name" id="mood-name"></div>
+      <div class="mood-desc" id="mood-desc"></div>
+    </div>
+    <div class="playlist-header">
+      <span>Playlist</span>
+      <span id="track-count"></span>
+    </div>
+    <div class="track-list" id="track-list"></div>
+    <div class="search-links" id="search-links"></div>
+    <button class="restart-btn" onclick="restart()">↺ Start over</button>
+  </div>
+
+  <!-- SPOTIFY SETUP -->
+  <div class="screen" id="screen-spotify-setup">
+    <div class="api-screen fade-in">
+      <div class="api-title">Connect Spotify</div>
+      <div class="api-sub">
+        To create playlists in your Spotify account, you need<br>
+        a free Client ID from Spotify's developer dashboard.<br><br>
+        <strong style="color:var(--ink);">How to get one (2 minutes):</strong><br>
+        1. Go to <a href="https://developer.spotify.com/dashboard" target="_blank" style="color:var(--accent);">developer.spotify.com/dashboard</a><br>
+        2. Create an app — name it anything<br>
+        3. Add <code style="color:var(--accent);font-size:.7rem;">moodlist://callback</code> as a Redirect URI<br>
+        4. Copy your Client ID below
+      </div>
+      <div class="api-input-wrap">
+        <input type="text" class="api-input" id="spotify-client-input" placeholder="Spotify Client ID…" autocomplete="off">
+        <button class="api-save" onclick="saveSpotifyClient()">Save</button>
+      </div>
+      <div class="api-status" id="spotify-status"></div>
+      <button class="api-skip" onclick="showScreen('screen-playlist')">← Back to playlist</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── QUESTIONS ─────────────────────────────────────────────────
+
+// ── QUESTIONS ─────────────────────────────────────────────────
+const QUESTIONS = [
+  {
+    text: "If today were a room, what would it look like?",
+    options: [
+      { label: "Cluttered, a bit chaotic — full of half-finished things", value: "overwhelmed" },
+      { label: "Bare and still — just the essentials, nothing extra", value: "empty" },
+      { label: "Warm, familiar — like somewhere you've always known", value: "content" },
+      { label: "A window left open — restless and waiting", value: "restless" },
+    ]
+  },
+  {
+    text: "What's your relationship with time right now?",
+    options: [
+      { label: "It's moving too fast — I can't keep up", value: "anxious" },
+      { label: "It's dragging — I'm waiting for something", value: "anticipating" },
+      { label: "I've lost track of it entirely", value: "dissociated" },
+      { label: "It feels just right — I'm in step with it", value: "grounded" },
+    ]
+  },
+  {
+    text: "If your body were a weather system today, what would it be?",
+    options: [
+      { label: "A pressure front — heavy, about to break", value: "tense" },
+      { label: "Overcast — grey and low, but not stormy", value: "melancholic" },
+      { label: "Clear and dry — light, expansive", value: "calm" },
+      { label: "Unpredictable — sun then rain then sun again", value: "volatile" },
+    ]
+  },
+  {
+    text: "What kind of light feels right for where you are emotionally?",
+    options: [
+      { label: "Golden hour — soft, a little bittersweet", value: "nostalgic" },
+      { label: "Neon at night — electric and a bit blurred", value: "energised" },
+      { label: "Overcast midday — flat, directionless", value: "low" },
+      { label: "Candlelight — contained, intimate, quiet", value: "reflective" },
+    ]
+  },
+  {
+    text: "Choose a texture that matches how you're moving through the world right now:",
+    options: [
+      { label: "Gravel — each step takes effort and feels it", value: "struggling" },
+      { label: "Still water — gliding, almost frictionless", value: "peaceful" },
+      { label: "Sandpaper — irritated at the edges", value: "irritable" },
+      { label: "Velvet — rich, a little slow, indulgent", value: "luxurious" },
+    ]
+  },
+  {
+    text: "When you imagine the next 24 hours, what's the first feeling?",
+    options: [
+      { label: "Dread — something I have to get through", value: "dreading" },
+      { label: "Curiosity — I'm not sure what's ahead", value: "curious" },
+      { label: "Tiredness — I just want it to be over", value: "exhausted" },
+      { label: "A quiet kind of hope", value: "hopeful" },
+    ]
+  },
+  {
+    text: "What would feel most natural to do with your hands right now?",
+    options: [
+      { label: "Press them flat against something solid", value: "grounding" },
+      { label: "Let them hang, loose and heavy", value: "depleted" },
+      { label: "Move them — drum, fidget, gesture", value: "restless" },
+      { label: "Hold something warm", value: "seeking_comfort" },
+    ]
+  },
+  {
+    text: "If this feeling had a soundtrack principle — not a song, a principle — what would it be?",
+    options: [
+      { label: "Long, slow notes that don't resolve", value: "unresolved" },
+      { label: "A repeating pattern that gradually changes", value: "processing" },
+      { label: "Silence with occasional interruptions", value: "fragile" },
+      { label: "Full and layered — everything at once", value: "overwhelmed_rich" },
+    ]
+  }
+];
+
+let answers = [];
+let currentQ = 0;
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function checkAPIKey() {
+  if (localStorage.getItem('moodlist_key')) {
+    startQuestions();
+  } else {
+    showScreen('screen-api');
+  }
+}
+
+function saveKey() {
+  const key = document.getElementById('api-input').value.trim();
+  if (!key.startsWith('sk-ant-')) {
+    document.getElementById('api-status').textContent = 'That doesn\'t look right — check your key';
+    document.getElementById('api-status').style.color = '#c97070';
+    return;
+  }
+  localStorage.setItem('moodlist_key', key);
+  document.getElementById('api-status').textContent = '✓ Saved';
+  document.getElementById('api-status').style.color = 'var(--accent)';
+  setTimeout(() => startQuestions(), 800);
+}
+
+function startQuestions() {
+  answers = [];
+  currentQ = 0;
+  showScreen('screen-questions');
+  renderQuestion();
+}
+
+function renderQuestion() {
+  const q = QUESTIONS[currentQ];
+  const total = QUESTIONS.length;
+  const pct = (currentQ / total) * 100;
+
+  document.getElementById('q-meta').textContent = `Question ${currentQ + 1} of ${total}`;
+  document.getElementById('progress-fill').style.width = pct + '%';
+
+  const qText = document.getElementById('question-text');
+  qText.style.opacity = 0;
+  setTimeout(() => {
+    qText.textContent = q.text;
+    qText.style.transition = 'opacity 0.5s ease';
+    qText.style.opacity = 1;
+  }, 150);
+
+  const grid = document.getElementById('options-grid');
+  grid.style.opacity = 0;
+  setTimeout(() => {
+    grid.innerHTML = q.options.map((opt, i) => `
+      <button class="option-btn" onclick="selectAnswer('${opt.value}', '${escQ(opt.label)}')">
+        <span class="option-letter">${String.fromCharCode(65+i)}</span>
+        ${opt.label}
+      </button>
+    `).join('');
+    grid.style.transition = 'opacity 0.5s ease';
+    grid.style.opacity = 1;
+  }, 200);
+}
+
+function escQ(s) { return s.replace(/'/g, "\\'"); }
+
+function selectAnswer(value, label) {
+  answers.push({ question: QUESTIONS[currentQ].text, answer: label, value });
+
+  // Flash selected
+  event.target.closest('.option-btn').classList.add('selected');
+
+  setTimeout(() => {
+    currentQ++;
+    if (currentQ >= QUESTIONS.length) {
+      generatePlaylist();
+    } else {
+      renderQuestion();
+    }
+  }, 400);
+}
+
+// ── GENERATE PLAYLIST ─────────────────────────────────────────
+const loadingPhrases = [
+  "Reading between the lines",
+  "Translating your frequency",
+  "Mapping the emotional landscape",
+  "Searching for your sound",
+  "Composing the atmosphere",
+];
+
+async function generatePlaylist() {
+  showScreen('screen-loading');
+  let phraseIdx = 0;
+  const lt = document.getElementById('loading-text');
+  const phraseInterval = setInterval(() => {
+    phraseIdx = (phraseIdx + 1) % loadingPhrases.length;
+    lt.style.opacity = 0;
+    setTimeout(() => {
+      lt.textContent = loadingPhrases[phraseIdx];
+      lt.style.transition = 'opacity 0.5s';
+      lt.style.opacity = 1;
+    }, 300);
+  }, 2500);
+
+  const prompt = buildPrompt();
+  const key = localStorage.getItem('moodlist_key');
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    const data = await res.json();
+    clearInterval(phraseInterval);
+
+    if (data.error) throw new Error(data.error.message);
+
+    const text = data.content[0].text;
+    const json = JSON.parse(text.match(/\{[\s\S]*\}/)[0]);
+    renderPlaylist(json);
+
+  } catch(e) {
+    clearInterval(phraseInterval);
+    console.error(e);
+    lt.textContent = 'Something went wrong — try again';
+    lt.style.color = '#c97070';
+    setTimeout(() => restart(), 3000);
+  }
+}
+
+function buildPrompt() {
+  const answerSummary = answers.map((a, i) =>
+    `Q${i+1}: "${a.question}"\nAnswer: "${a.answer}" (emotional signal: ${a.value})`
+  ).join('\n\n');
+
+  return `You are a world-class music curator, musicologist, and music therapist with encyclopedic knowledge of recorded music across all genres, eras, and cultures. You specialise in finding the most sonically and emotionally precise songs for a given moment — not just popular or obvious choices, but the exact right song.
+
+A user has answered 8 indirect, poetic questions designed to reveal their emotional state without asking directly:
+
+${answerSummary}
+
+ANALYSIS TASK:
+Read between the lines carefully. Consider:
+- The emotional texture (not just the label, but the specific quality — e.g. not just "sad" but "the specific sadness of feeling left behind")
+- Energy level and physical state (are they still, agitated, heavy, light?)
+- Cognitive state (scattered, focused, dreamy, sharp?)
+- What they need vs what they feel (sometimes these differ)
+- Time of day and environmental feel implied by their answers
+- The arc of the emotion — is it building, dissipating, stuck, transforming?
+
+PLAYLIST RULES — follow these strictly:
+1. Choose 10 songs with extreme precision — every song must feel inevitable for this specific mood
+2. AVOID obvious choices and overplayed songs. No "Hurt" by NIN, no "Mad World", no "Weightless" by Marconi Union, no songs that appear on every mood playlist
+3. Mix eras (pull from 1960s through today), mix genres (classical, jazz, ambient, folk, electronic, soul, indie, world music — whatever actually fits)
+4. At least 4 tracks should be deep cuts — songs most people haven't heard but which are perfect
+5. At least 2 tracks should be instrumental if the mood calls for wordlessness
+6. Consider production texture: reverb-heavy vs dry, sparse vs dense, warm vs cold — match this to the mood
+7. The playlist should have a shape — consider it a 30-40 minute journey with an opening, middle, and resolution
+8. For each track, consider: tempo, key (major/minor/modal), vocal presence, instrumentation, dynamics, and how the lyrics (if any) land emotionally
+9. Prioritise songs that are actually on Spotify (avoid extremely rare bootlegs or unreleased tracks)
+10. Be specific and confident — don't hedge toward safe choices
+
+Respond ONLY with a JSON object in exactly this format (no markdown, no explanation outside the JSON):
+{
+  "mood": "Two or three word poetic mood name that captures the specific emotional quality (e.g. 'quiet dissolution' or 'restless gold' or 'hollow afternoon')",
+  "description": "2-3 sentences describing the specific emotional state you detected and why this playlist fits. Write directly to the user in second person, warmly and perceptively. Name what you noticed.",
+  "tracks": [
+    {
+      "title": "Song Title",
+      "artist": "Artist Name",
+      "why": "One precise phrase (max 7 words) explaining the sonic or emotional reason"
+    }
+  ]
+}`;
+}
+
+function renderPlaylist(data) {
+  document.getElementById('mood-name').textContent = data.mood;
+  document.getElementById('mood-desc').textContent = data.description;
+  document.getElementById('track-count').textContent = `${data.tracks.length} tracks`;
+
+  const list = document.getElementById('track-list');
+  list.innerHTML = data.tracks.map((t, i) => `
+    <div class="track" style="animation-delay:${i * 0.08}s">
+      <div class="track-num">${String(i+1).padStart(2,'0')}</div>
+      <div class="track-info">
+        <div class="track-title">${t.title}</div>
+        <div class="track-artist">${t.artist}</div>
+      </div>
+      <div class="track-why">${t.why}</div>
+    </div>
+  `).join('');
+
+  // Build search links for the full playlist
+  const query = encodeURIComponent(data.tracks.slice(0,3).map(t => `${t.title} ${t.artist}`).join(' '));
+  const firstTrack = encodeURIComponent(`${data.tracks[0].title} ${data.tracks[0].artist}`);
+
+  const spotifyClientId = localStorage.getItem('moodlist_spotify_client');
+  document.getElementById('search-links').innerHTML = `
+    <button class="spotify-add-btn" onclick="handleSpotifyAdd()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+      Add to Spotify
+    </button>
+    <a class="search-link" href="https://music.youtube.com/search?q=${firstTrack}" target="_blank">YouTube Music</a>
+    <a class="search-link" href="https://www.last.fm/search?q=${firstTrack}" target="_blank">Last.fm</a>
+  `;
+
+  // Update ambient based on mood
+  currentPlaylistData = data;
+  localStorage.setItem('moodlist_pending_playlist', JSON.stringify(data));
+  updateAmbient(data.mood);
+
+  showScreen('screen-playlist');
+}
+
+function updateAmbient(mood) {
+  const amb = document.getElementById('ambient');
+  const m = mood.toLowerCase();
+  if (m.includes('sad') || m.includes('low') || m.includes('melt') || m.includes('dissol')) {
+    amb.style.background = 'radial-gradient(ellipse 60% 40% at 30% 40%, rgba(100,120,180,0.08) 0%, transparent 70%)';
+  } else if (m.includes('energy') || m.includes('restless') || m.includes('electric')) {
+    amb.style.background = 'radial-gradient(ellipse 60% 40% at 70% 30%, rgba(200,120,80,0.07) 0%, transparent 70%)';
+  } else if (m.includes('calm') || m.includes('peace') || m.includes('still')) {
+    amb.style.background = 'radial-gradient(ellipse 80% 60% at 50% 50%, rgba(100,160,140,0.06) 0%, transparent 70%)';
+  } else {
+    amb.style.background = 'radial-gradient(ellipse 60% 40% at 20% 30%, rgba(201,169,110,0.06) 0%, transparent 70%)';
+  }
+}
+
+function restart() {
+  answers = [];
+  currentQ = 0;
+  showScreen('screen-intro');
+}
+
+
+// ── SPOTIFY PKCE OAUTH ───────────────────────────────────────
+let currentPlaylistData = null;
+let spotifyToken = null;
+
+// PKCE helpers
+async function generateCodeVerifier() {
+  const array = new Uint8Array(64);
+  crypto.getRandomValues(array);
+  return btoa(String.fromCharCode(...array))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+async function generateCodeChallenge(verifier) {
+  const data = new TextEncoder().encode(verifier);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+function saveSpotifyClient() {
+  const id = document.getElementById('spotify-client-input').value.trim();
+  if (!id || id.length < 10) {
+    document.getElementById('spotify-status').textContent = "That doesn't look like a valid Client ID";
+    document.getElementById('spotify-status').style.color = '#c97070';
+    return;
+  }
+  localStorage.setItem('moodlist_spotify_client', id);
+  document.getElementById('spotify-status').textContent = '✓ Client ID saved';
+  document.getElementById('spotify-status').style.color = 'var(--accent)';
+  setTimeout(() => {
+    showScreen('screen-playlist');
+    spotifyAuth();
+  }, 700);
+}
+
+function handleSpotifyAdd() {
+  const clientId = localStorage.getItem('moodlist_spotify_client');
+  if (!clientId) { showSpotifyModal('setup'); return; }
+
+  const token = localStorage.getItem('spotify_token');
+  const expiry = localStorage.getItem('spotify_token_expiry');
+  if (token && expiry && Date.now() < parseInt(expiry)) {
+    spotifyToken = token;
+    showSpotifyModal('confirm');
+  } else {
+    spotifyAuth();
+  }
+}
+
+async function spotifyAuth() {
+  const clientId = localStorage.getItem('moodlist_spotify_client');
+  if (!clientId) { showScreen('screen-spotify-setup'); return; }
+
+  const redirectUri = window.location.origin + window.location.pathname;
+  const verifier = await generateCodeVerifier();
+  const challenge = await generateCodeChallenge(verifier);
+  const state = Math.random().toString(36).substring(2);
+
+  localStorage.setItem('spotify_verifier', verifier);
+  localStorage.setItem('spotify_state', state);
+  localStorage.setItem('spotify_redirect', redirectUri);
+
+  const scopes = 'playlist-modify-public playlist-modify-private';
+  const params = new URLSearchParams({
+    client_id: clientId,
+    response_type: 'code',
+    redirect_uri: redirectUri,
+    code_challenge_method: 'S256',
+    code_challenge: challenge,
+    state: state,
+    scope: scopes,
+  });
+
+  window.location = `https://accounts.spotify.com/authorize?${params}`;
+}
+
+async function checkSpotifyCallback() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  const state = params.get('state');
+  const error = params.get('error');
+
+  if (error) {
+    console.error('Spotify auth error:', error);
+    history.replaceState(null, '', window.location.pathname);
+    return;
+  }
+
+  if (!code) return;
+  if (state !== localStorage.getItem('spotify_state')) {
+    console.error('State mismatch');
+    history.replaceState(null, '', window.location.pathname);
+    return;
+  }
+
+  // Exchange code for token
+  const clientId = localStorage.getItem('moodlist_spotify_client');
+  const verifier = localStorage.getItem('spotify_verifier');
+  const redirectUri = localStorage.getItem('spotify_redirect');
+
+  try {
+    const res = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: redirectUri,
+        client_id: clientId,
+        code_verifier: verifier,
+      })
+    });
+
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    spotifyToken = data.access_token;
+    localStorage.setItem('spotify_token', data.access_token);
+    localStorage.setItem('spotify_token_expiry', Date.now() + data.expires_in * 1000);
+    if (data.refresh_token) localStorage.setItem('spotify_refresh', data.refresh_token);
+
+    // Clean URL
+    history.replaceState(null, '', window.location.pathname);
+
+    // Restore playlist data from storage and show confirm
+    const saved = localStorage.getItem('moodlist_pending_playlist');
+    if (saved) {
+      currentPlaylistData = JSON.parse(saved);
+      renderPlaylist(currentPlaylistData);
+    }
+    showSpotifyModal('confirm');
+
+  } catch(e) {
+    console.error('Token exchange failed:', e);
+    history.replaceState(null, '', window.location.pathname);
+  }
+}
+
+function showSpotifyModal(type) {
+  const existing = document.getElementById('spotify-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.className = 'spotify-modal';
+  modal.id = 'spotify-modal';
+
+  if (type === 'setup') {
+    modal.innerHTML = `
+      <div class="spotify-modal-inner">
+        <div class="spotify-modal-title">Connect Spotify</div>
+        <div class="spotify-modal-sub">
+          You need a free Spotify Client ID to create playlists.<br>
+          It only takes about 2 minutes to set up.
+        </div>
+        <button class="spotify-modal-btn" onclick="closeModal();showScreen('screen-spotify-setup')">
+          Set up Spotify →
+        </button>
+        <br>
+        <button class="spotify-modal-close" onclick="closeModal()">Cancel</button>
+      </div>`;
+  } else if (type === 'confirm') {
+    const name = currentPlaylistData.mood;
+    modal.innerHTML = `
+      <div class="spotify-modal-inner">
+        <div class="spotify-modal-title">Save to Spotify</div>
+        <div class="spotify-modal-sub">
+          This will create a playlist called<br>
+          <em style="color:var(--accent);">"Moodlist: ${name}"</em><br>
+          in your Spotify account with ${currentPlaylistData.tracks.length} tracks.
+        </div>
+        <button class="spotify-modal-btn" onclick="createSpotifyPlaylist()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+          Create Playlist
+        </button>
+        <br>
+        <button class="spotify-modal-close" onclick="closeModal()">Cancel</button>
+      </div>`;
+  } else if (type === 'progress') {
+    modal.innerHTML = `
+      <div class="spotify-modal-inner">
+        <div class="spotify-modal-title">Creating playlist…</div>
+        <div class="spotify-progress" id="spotify-progress-log"></div>
+      </div>`;
+  } else if (type === 'done') {
+    const plUrl = localStorage.getItem('spotify_last_playlist_url') || 'https://open.spotify.com';
+    modal.innerHTML = `
+      <div class="spotify-modal-inner">
+        <div class="spotify-done-title">Playlist saved ✓</div>
+        <div class="spotify-modal-sub" style="margin-bottom:24px;">
+          <em style="color:var(--accent);">Moodlist: ${currentPlaylistData.mood}</em> is in your library.<br><br>
+          <span style="color:var(--muted);font-size:.62rem;">If you don't see it, check "Made for you" or search your library for "Moodlist".</span>
+        </div>
+        <a class="spotify-open-btn" href="${plUrl}" target="_blank">
+          Open Playlist in Spotify
+        </a>
+        <br>
+        <button class="spotify-modal-close" onclick="closeModal()">Close</button>
+      </div>`;
+  } else if (type === 'error') {
+    modal.innerHTML = `
+      <div class="spotify-modal-inner">
+        <div class="spotify-modal-title">Something went wrong</div>
+        <div class="spotify-modal-sub">
+          Couldn't add all tracks. Some songs may not be available<br>
+          in your region or on Spotify.
+        </div>
+        <a class="spotify-open-btn" href="https://open.spotify.com" target="_blank">Open Spotify anyway</a>
+        <br>
+        <button class="spotify-modal-close" onclick="closeModal()">Close</button>
+      </div>`;
+  }
+
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+}
+
+function closeModal() {
+  const m = document.getElementById('spotify-modal');
+  if (m) m.remove();
+}
+
+function log(msg, ok=true) {
+  const el = document.getElementById('spotify-progress-log');
+  if (!el) return;
+  el.innerHTML += `<div>${ok ? '<span>✓</span>' : '<span style="color:#c97070">✗</span>'} ${msg}</div>`;
+}
+
+async function createSpotifyPlaylist() {
+  showSpotifyModal('progress');
+  const token = spotifyToken || localStorage.getItem('spotify_token');
+
+  try {
+    // 1. Get user ID
+    log('Getting your Spotify profile…');
+    const meRes = await fetch('https://api.spotify.com/v1/me', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!meRes.ok) throw new Error('Auth failed');
+    const me = await meRes.json();
+    const userId = me.id;
+    log(`Logged in as ${me.display_name || userId}`);
+
+    // 2. Create playlist
+    const playlistName = `Moodlist: ${currentPlaylistData.mood}`;
+    log(`Creating "${playlistName}"…`);
+    const plRes = await fetch(`https://api.spotify.com/v1/users/${userId}/playlists`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        name: playlistName,
+        description: currentPlaylistData.description,
+        public: true
+      })
+    });
+    const playlist = await plRes.json();
+    localStorage.setItem('spotify_last_playlist_url', playlist.external_urls?.spotify || 'https://open.spotify.com');
+    log('Playlist created');
+
+    // 3. Search for each track — three fallback strategies
+    log('Searching for tracks…');
+    const uris = [];
+    for (const track of currentPlaylistData.tracks) {
+      let found = null;
+
+      // Strategy 1: strict field filters
+      try {
+        const q1 = encodeURIComponent('track:' + track.title + ' artist:' + track.artist);
+        const r1 = await fetch('https://api.spotify.com/v1/search?q=' + q1 + '&type=track&limit=1', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        const d1 = await r1.json();
+        found = d1.tracks?.items?.[0];
+      } catch(e) {}
+
+      // Strategy 2: free text title + artist
+      if (!found) {
+        try {
+          const q2 = encodeURIComponent(track.title + ' ' + track.artist);
+          const r2 = await fetch('https://api.spotify.com/v1/search?q=' + q2 + '&type=track&limit=1', {
+            headers: { 'Authorization': 'Bearer ' + token }
+          });
+          const d2 = await r2.json();
+          found = d2.tracks?.items?.[0];
+        } catch(e) {}
+      }
+
+      // Strategy 3: title only, match artist loosely
+      if (!found) {
+        try {
+          const q3 = encodeURIComponent(track.title);
+          const r3 = await fetch('https://api.spotify.com/v1/search?q=' + q3 + '&type=track&limit=5', {
+            headers: { 'Authorization': 'Bearer ' + token }
+          });
+          const d3 = await r3.json();
+          const artistFirst = track.artist.split(' ')[0].toLowerCase();
+          found = d3.tracks?.items?.find(t =>
+            t.artists.some(a => a.name.toLowerCase().includes(artistFirst))
+          ) || d3.tracks?.items?.[0];
+        } catch(e) {}
+      }
+
+      if (found) {
+        uris.push(found.uri);
+        log('Found: ' + found.name + ' — ' + found.artists[0].name);
+      } else {
+        log('Not found: ' + track.title, false);
+      }
+    }
+
+    // 4. Add tracks to playlist
+    if (uris.length > 0) {
+      await fetch(`https://api.spotify.com/v1/playlists/${playlist.id}/tracks`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ uris })
+      });
+      log(`Added ${uris.length} tracks ✓`);
+    }
+
+    setTimeout(() => showSpotifyModal('done'), 1200);
+
+  } catch(e) {
+    console.error(e);
+    showSpotifyModal('error');
+  }
+}
+
+// Check for Spotify OAuth callback on page load
+window.addEventListener('load', async () => {
+  await checkSpotifyCallback();
+});
+</script>
+</body>
+</html>
